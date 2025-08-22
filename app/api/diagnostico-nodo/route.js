@@ -11,33 +11,59 @@ const agent = new https.Agent({
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const pkConexion = searchParams.get('pk_conexion');
+    const cedula = searchParams.get('cedula');
 
-    if (!pkConexion) {
-      return NextResponse.json({ error: 'Falta el parámetro pk_conexion' }, { status: 400 });
+    if (!cedula) {
+      return NextResponse.json({ error: 'Falta el parámetro cedula' }, { status: 400 });
     }
-    
-    // Credenciales y URL de la API
+
+    // Credenciales y URLs de las APIs
     const USERNAME_815 = process.env.BASIC_AUTH_USERNAME;
     const PASSWORD_815 = process.env.BASIC_AUTH_PASSWORD_G1;
-    const API_URL_815 = process.env.URL_TOKEN;
     const basicAuthToken = Buffer.from(`${USERNAME_815}:${PASSWORD_815}`).toString('base64');
     
-    console.log(`--- Realizando diagnóstico para PK: ${pkConexion} ---`);
+    // --- PASO 1: OBTENER PK_CONEXION DEL SERVICIO DE CLIENTES ---
+    console.log(`--- Buscando cliente con cédula: ${cedula} ---`);
+    // const clientesURL = `https://g1arcofer.815d.net:815/gateway/integracion/clientes/cuentasimple/listar?&extra_1=${cedula}&json`;
+    const clientesResponse = await axios.get(
+    `https://g1arcofer.815d.net:815/gateway/integracion/clientes/cuentasimple/listar?&json&extra_1=${cedula}`,
+      {
+        httpsAgent: agent,
+        headers: { 'Authorization': `Basic ${basicAuthToken}` },
+      }
+    );
 
-    const response = await axios.get(
-      `https://g1arcofer.815d.net:815/gateway/integracion/hardware/nodored/diagnosticar_multiapi/?pk_conexion=${pkConexion}&json`,
+    const clienteData = clientesResponse.data;
+    console.log(`✅ Cliente encontrado: ${clienteData} registros.`);
+
+    if (!clienteData || clienteData.length === 0 || !clienteData[0].pk) {
+      return NextResponse.json(
+        { error: 'No se encontró un cliente o pk_conexion para la cédula proporcionada' },
+        { status: 404 }
+      );
+    }
+
+    const pkConexion = clienteData[0].pk;
+    console.log(`✅ PK de conexión encontrado: ${pkConexion}`);
+
+    console.log(`--- Realizando diagnóstico para PK: ${pkConexion} ---`);
+    const diagnosticoURL = `https://g1arcofer.815d.net:815/gateway/integracion/hardware/nodored/diagnosticar_multiapi/?pk_conexion=${pkConexion}&json`;
+    const diagnosticoResponse = await axios.get(
+      diagnosticoURL,
       {
         httpsAgent: agent,
         headers: { 'Authorization': `Basic ${basicAuthToken}` },
       }
     );
     
-    return NextResponse.json(response.data, { status: 200 });
+    // Devolver el resultado del diagnóstico
+    return NextResponse.json(diagnosticoResponse.data, { status: 200 });
 
   } catch (error) {
-    console.error('❌ Error en el diagnóstico del nodo.');
+    console.error('❌ Error en el proceso de diagnóstico.');
     console.error('Mensaje de error:', error.message);
+    
+    // Manejo de errores detallado
     if (error.response) {
       console.error('Detalles del error HTTP:', error.response.status, error.response.data);
       return NextResponse.json(

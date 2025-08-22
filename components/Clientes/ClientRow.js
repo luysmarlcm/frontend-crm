@@ -14,7 +14,7 @@ export default function ClientRow({ client }) {
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{client.conector}</td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{client.direccion_ip_815?.direccion_ip}</td>
       <td className="px-6 py-4 whitespace-nowrap">
-        <StatusBadge status={client.status} />
+        {/* <StatusBadge status={client.estado} /> */}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{client.plan_internet?.nombre}</td>
       {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{client.router}</td> */}

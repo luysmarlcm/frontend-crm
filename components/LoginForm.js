@@ -5,7 +5,7 @@ import React from 'react';
 const LoginForm = () => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-blue-500">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
+      {/* <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Hi,</h1>
         <h2 className="text-2xl font-semibold text-gray-700 mb-8">Welcome back</h2>
         <form>
@@ -41,7 +41,7 @@ const LoginForm = () => {
           Don't have account?{' '}
           <a href="#" className="font-semibold text-blue-600 hover:underline">Sign up</a>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };

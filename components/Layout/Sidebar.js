@@ -27,7 +27,7 @@ export default function Sidebar() {
           <SidebarLink text="Soporte Técnico" href="/soporte">
             <Gauge  className="h-5 w-5" />
           </SidebarLink>
-          <SidebarLink text="User Administration" href="/cliente">
+          {/* <SidebarLink text="User Administration" href="/cliente">
             <Users  className="h-5 w-5" />
           </SidebarLink>        
           <SidebarLink text="Finances" href="/cliente" >
@@ -39,7 +39,7 @@ export default function Sidebar() {
            
           <SidebarLink text="Sector/Node/NAP" href="/sector">
            <Router  className="h-5 w-5" /> 
-          </SidebarLink>
+          </SidebarLink> */}
   
         </SidebarSection>
       </nav>

@@ -34,7 +34,7 @@ const parsePingResults = (pingData) => {
 };
 
 export default function ConnectionDiagnostics() {
-  const [pkConexion, setPkConexion] = useState('');
+  const [cedula, setCedula] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [resultado, setResultado] = useState(null);
@@ -45,14 +45,14 @@ export default function ConnectionDiagnostics() {
     setError(null);
     setResultado(null);
 
-    if (!pkConexion) {
+    if (!cedula) {
       setError('Por favor, ingresa un PK de conexión.');
       setLoading(false);
       return;
     }
 
     try {
-      const url = `/api/diagnostico-nodo?pk_conexion=${pkConexion}`;
+      const url = `/api/diagnostico-nodo?cedula=${cedula}`;
       const response = await axios.get(url);
       setResultado(response.data);
       console.log('Resultado del diagnóstico:', response.data);
@@ -97,14 +97,14 @@ export default function ConnectionDiagnostics() {
             </div>
           </div>
           <div className="flex-1">
-            <label htmlFor="client-id" className="block text-sm font-medium text-gray-700">Conexion Pk</label>
+            <label htmlFor="client-id" className="block text-sm font-medium text-gray-700">Cedula</label>
             <input
               type="text"
               id="client-id"
               className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md placeholder:text-gray-400 bg-white"
-              placeholder="PK conexion"
-              value={pkConexion}
-              onChange={(e) => setPkConexion(e.target.value)}
+              placeholder="Cédula del cliente"
+              value={cedula}
+              onChange={(e) => setCedula(e.target.value)}
             />
           </div>
           <button
