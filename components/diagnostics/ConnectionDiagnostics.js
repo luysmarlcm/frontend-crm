@@ -5,25 +5,39 @@ import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CardSection from './CardSection';
 import DataField from './DataField';
-import { Gauge, Search, IdCard, LifeBuoy, Network, ArrowDownUp, Info, Waypoints } from 'lucide-react';
+import { Gauge, Search, IdCard, LifeBuoy, ArrowDownUp, Info, Waypoints } from 'lucide-react';
 import HeaderPage from '../HeaderPage';
+import Tabs from '../Tabs';
 
+
+const tabs = [
+    {
+      id: 'client-data',
+      label: 'DATOS DE CLIENTE',
+      // content: <ClientData />,
+    },
+    {
+      id: 'diagnostics',
+      label: 'DIAGNÓSTICO',
+      // content: <ConnectionDiagnostics />,
+    },
+    {
+      id: 'tickets',
+      label: 'TICKETS',
+      // content: <TicketsComponent />,
+    },
+  ];
 
 // Función utilitaria para parsear los resultados del ping
 const parsePingResults = (pingData) => {
-  if (!pingData) {
-    return { pingTimes: [], pingSummary: '' };
-  }
+  if (!pingData) return { pingTimes: [], pingSummary: '' };
 
   const pingTimes = [];
   const individualPingRegex = /icmp_seq=(\d+)\s+ttl=\d+\s+time=(\d+\.\d+)\s+ms/g;
 
   let match;
   while ((match = individualPingRegex.exec(pingData)) !== null) {
-    pingTimes.push({
-      sequence: parseInt(match[1]),
-      time: parseFloat(match[2]),
-    });
+    pingTimes.push({ sequence: parseInt(match[1]), time: parseFloat(match[2]) });
   }
 
   const summaryRegex = /---.*?ping statistics ---\n[\s\S]*?rtt min\/avg\/max\/mdev =.*?\n/g;
@@ -40,41 +54,23 @@ export default function ConnectionDiagnostics() {
   const [resultado, setResultado] = useState(null);
   const [multipleConnections, setMultipleConnections] = useState(null);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const fetchData = async (cedula) => {
     setLoading(true);
     setError(null);
     setResultado(null);
     setMultipleConnections(null);
 
-    if (!cedula) {
-      setError('Por favor, ingresa una cédula.');
-      setLoading(false);
-      return;
-    }
-    
-    // Inicia la búsqueda inicial con la cédula
-    await fetchData(`/api/diagnostico-nodo?cedula=${cedula}`);
-  };
-
-  const handleConnectionSelect = async (pk) => {
-    setLoading(true);
-    setError(null);
-    setResultado(null);
-    setMultipleConnections(null);
-    // Realiza la segunda llamada con el PK seleccionado
-    await fetchData(`/api/diagnostico-nodo?cedula=${cedula}&pk=${pk}`);
-  };
-
-  const fetchData = async (url) => {
     try {
-      const response = await axios.get(url);
-      
-      if (response.data.status === 'multiple_connections') {
-        setMultipleConnections(response.data.data);
+      const response = await axios.get(`http://localhost:4000/api/clientes/cedula/${cedula}`);
+
+      // Si la API devuelve un array de múltiples conexiones
+      if (Array.isArray(response.data) && response.data.length > 1) {
+        setMultipleConnections(response.data);
       } else {
-        setResultado(response.data);
+        // Caso de un único cliente
+        setResultado(Array.isArray(response.data) ? response.data[0] : response.data);
       }
+
       console.log('Resultado de la API:', response.data);
     } catch (err) {
       const errorMessage = err.response
@@ -87,13 +83,26 @@ export default function ConnectionDiagnostics() {
     }
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!cedula) {
+      setError('Por favor, ingresa una cédula.');
+      return;
+    }
+    fetchData(cedula);
+  };
+
+  const handleConnectionSelect = (pk) => {
+    if (!multipleConnections) return;
+    const selected = multipleConnections.find(conn => conn.pk === pk);
+    if (selected) setResultado(selected);
+    setMultipleConnections(null);
+  };
+
   const connectionData = resultado?.conexion || {};
   const onuData = resultado?.onu || {};
 
-  // Parseamos los resultados del ping una sola vez
-  const { pingTimes, pingSummary } = useMemo(() => {
-    return parsePingResults(connectionData.conexion_ping_icmp);
-  }, [connectionData.conexion_ping_icmp]);
+  const { pingTimes, pingSummary } = useMemo(() => parsePingResults(connectionData.conexion_ping_icmp), [connectionData.conexion_ping_icmp]);
 
   return (
     <div className="p-8 bg-gray-100 min-h-screen font-sans">
@@ -101,19 +110,8 @@ export default function ConnectionDiagnostics() {
         <div className="flex items-center space-x-2 mb-6">
           <HeaderPage title="Diagnóstico de Conexión" IconComponent={Gauge} />
         </div>
+
         <form onSubmit={handleSubmit} className="flex items-end space-x-4 mb-6 bg-gray-50 py-4 px-6 rounded-md">
-          <div className="flex-1">
-             <label htmlFor="hub-zone" className="block text-sm font-medium text-gray-700">HUB / Zona</label>
-             <div className="relative mt-1 rounded-md shadow-sm bg-white border border-gray-300">
-               <select id="hub-zone" className="focus:ring-green-500 focus:border-green-500 block w-full pl-10 pr-4 sm:text-sm border-gray-300 rounded-md text-black placeholder:text-gray-400">
-                 <option value="">Seleccione HUB o Zona</option>
-                 <option value="hub1">HUB 1</option>
-                 <option value="hub2">HUB 2</option>
-                 <option value="zona1">Zona 1</option>
-                 <option value="zona2">Zona 2</option>
-               </select>
-             </div>
-          </div>
           <div className="flex-1">
             <label htmlFor="client-id" className="block text-sm font-medium text-gray-700">Cédula</label>
             <input
@@ -135,27 +133,23 @@ export default function ConnectionDiagnostics() {
           </button>
         </form>
 
-        {loading && (
-          <div className="p-4 mb-4 text-blue-700 bg-blue-100 rounded-lg">Cargando...</div>
-        )}
-        {error && (
-          <div className="p-4 mb-4 text-red-700 bg-red-100 rounded-lg">{error}</div>
-        )}
+        {/* <Tabs tabs={tabs} /> */}
 
-        {/* Manejo de múltiples conexiones */}
-        {!loading && multipleConnections && (
+        {loading && <div className="p-4 mb-4 text-blue-700 bg-blue-100 rounded-lg">Cargando...</div>}
+        {error && <div className="p-4 mb-4 text-red-700 bg-red-100 rounded-lg">{error}</div>}
+
+        {multipleConnections && (
           <div className="bg-blue-50 border border-blue-200 text-blue-800 p-6 rounded-lg shadow-inner mb-6">
             <h2 className="text-xl font-bold mb-4">Se encontraron múltiples conexiones.</h2>
-            <p className="mb-4">Por favor, selecciona la que deseas diagnosticar:</p>
             <div className="space-y-4">
-              {multipleConnections.map((conn) => (
+              {multipleConnections.map(conn => (
                 <div
                   key={conn.pk}
                   className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => handleConnectionSelect(conn.pk)}
                 >
                   <p className="font-semibold text-lg">{conn.fields.nombre_completo}</p>
-                  <p className="text-sm text-gray-600">PK de Conexión: <span className="font-mono">{conn.pk}</span></p>
+                  <p className="text-sm text-gray-600">PK: <span className="font-mono">{conn.pk}</span></p>
                   <p className="text-sm text-gray-600">Dirección: {conn.fields.domicilio || '—'}</p>
                 </div>
               ))}
@@ -163,67 +157,30 @@ export default function ConnectionDiagnostics() {
           </div>
         )}
 
-        {/* Muestra las cards SOLO SI NO SE ESTÁ CARGANDO, NO HAY MÚLTIPLES CONEXIONES Y HAY RESULTADOS */}
-        {!loading && resultado && !multipleConnections && (
+        {resultado && !multipleConnections && (
           <>
             <CardSection title="Datos Cliente" IconComponent={IdCard}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
                 <DataField label="Cliente" value={connectionData.conexion_nombre || '—'} />
-                <DataField label="Conexión" value={connectionData.conexion_nombre || '—'} />
                 <DataField label="Plan" value={connectionData.plan_nombre || '—'} />
                 <DataField label="Dirección IP" value={connectionData.direccion_ip || '—'} />
-                <DataField label="MAC Cargada" value={connectionData.mac_registrada || '—'} />
                 <DataField label="MAC Actual" value={connectionData.mac_actual || '—'} />
               </div>
             </CardSection>
 
-            <CardSection title="ONU / OLT Valores" IconComponent={LifeBuoy}>
-              <div className="grid grid-cols-3 gap-4">
-                <DataField label="Onu Status" value={<span className={` ${onuData.onu_status === 'Online' ? 'text-green-500' : 'text-red-500'}`}>{onuData.onu_status || '—'}</span>} />
-                <DataField label="ONU RX" value={onuData.onu_rx || '—'} />
-                <DataField label="ONU TX" value={onuData.onu_tx || '—'} />
-                <DataField label="OLT RX" value={onuData.onu_rx || '—'} />
-                <DataField label="OLT TX" value={connectionData.registro_evento?.[10]?.[2] || '—'} />
-              </div>
-            </CardSection>
-
-            <CardSection title="Información Adicional" IconComponent={Info}>
-              <div className="grid grid-cols-3 gap-4">
-                <DataField label="Onu Modelo" value={onuData.onu_producto || '—'} />
-                <DataField label="Version Firmware" value={onuData.onu_firmware || '—'} />
-                <DataField label="Numero de Serie" value={onuData.onu_numero_de_serie || '—'} />
-              </div>
-            </CardSection>
-
             {pingTimes.length > 0 && (
-                <CardSection title="Tiempos de Ping (ms)" IconComponent={Waypoints}>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={pingTimes} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="sequence" label={{ value: 'Secuencia de Paquetes', position: 'insideBottom', offset: -5 }} />
-                            <YAxis label={{ value: 'Tiempo de Ping (ms)', angle: -90, position: 'insideLeft' }} />
-                            <Tooltip />
-                            <Line type="monotone" dataKey="time" stroke="#82ca9d" name="Tiempo" />
-                        </LineChart>
-                    </ResponsiveContainer>
-                </CardSection>
+              <CardSection title="Tiempos de Ping (ms)" IconComponent={Waypoints}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={pingTimes}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="sequence" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="time" stroke="#82ca9d" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardSection>
             )}
-
-            {pingSummary && (
-                <CardSection title="Estadísticas de Ping" IconComponent={Waypoints}>
-                    <pre className="whitespace-pre-wrap text-sm text-gray-800 bg-gray-50 p-4 rounded-lg overflow-x-auto">
-                        {pingSummary}
-                    </pre>
-                </CardSection>
-            )}
-
-            <CardSection title="Tráfico Conexión" IconComponent={ArrowDownUp}>
-              <div className="grid grid-cols-3 gap-4">
-                <DataField label="Transferencia Mensual" value={connectionData.conexion_transferencia_mensual} />
-                <DataField label="Bajada Mensual" value={connectionData.conexion_bajada_mensual || '—'} />
-                <DataField label="Subida Mensual" value={connectionData.conexion_subida_mensual || '—'} />
-              </div>
-            </CardSection>
           </>
         )}
       </div>
