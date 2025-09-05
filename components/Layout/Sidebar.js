@@ -1,48 +1,52 @@
-// components/Sidebar.jsx
-
+'use client';
+import { ChevronLeft, ChevronRight, Gauge, Menu  } from 'lucide-react';
 import SidebarLink from './SidebarLink';
 import SidebarSection from './SidebarSection';
-// Importa los iconos de Lucide que necesitas
-import { CircleUser , Gauge , Clipboard, PiggyBank, Info, Map, ServerCog, LayoutDashboard , Users, Router,   } from 'lucide-react';
+import Image from 'next/image';
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed, setCollapsed }) {
   return (
-    <aside className="w-64 bg-white flex-shrink-0 min-h-screen p-4">
-      <div className="flex items-center space-x-2 mb-8">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-        </svg>
-        <h2 className="text-xl font-semibold text-black">CRM </h2>
+    <aside
+      className={`fixed top-0 left-0 h-screen bg-white border-r border-gray-200 shadow-lg 
+      flex flex-col justify-between transition-all duration-300
+      ${collapsed ? "w-20" : "w-64"}`}
+    >
+      {/* Header con logo */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+       
+
+        {/* Botón colapsar */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="p-1 rounded-md hover:bg-gray-100"
+        >
+          {collapsed ? <ChevronLeft  className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+         <div className="flex items-center space-x-2">
+          <Image
+            src="/image/logo.png"   
+           width={180} 
+            height={60} 
+            priority
+            alt="Logo CRM"
+          />
+          {/* {!collapsed && <h2 className="text-lg font-semibold text-black">CRM</h2>} */}
+        </div>
       </div>
 
-      <nav className="space-y-4">
+      {/* Links */}
+      <nav className="flex-1 overflow-y-auto p-4">
         <SidebarSection>
-         
-          <SidebarLink text="Dashboard" isActive={true} href="/">
-              <LayoutDashboard className="h-5 w-5" />
-            </SidebarLink>
-          <SidebarLink text="Clientes" href="/clientes">
-            <CircleUser className="h-5 w-5" />
+          <SidebarLink text={!collapsed ? "Soporte Técnico" : ""} href="/soporte">
+            <Gauge className="h-5 w-5" />
           </SidebarLink>
-          <SidebarLink text="Soporte Técnico" href="/soporte">
-            <Gauge  className="h-5 w-5" />
-          </SidebarLink>
-          {/* <SidebarLink text="User Administration" href="/cliente">
-            <Users  className="h-5 w-5" />
-          </SidebarLink>        
-          <SidebarLink text="Finances" href="/cliente" >
-            <PiggyBank className="h-5 w-5" />
-          </SidebarLink>
-          <SidebarLink text="Zona" href="/cliente">
-            <Map   className="h-5 w-5" /> 
-          </SidebarLink>
-           
-          <SidebarLink text="Sector/Node/NAP" href="/sector">
-           <Router  className="h-5 w-5" /> 
-          </SidebarLink> */}
-  
         </SidebarSection>
       </nav>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-gray-200">
+        {!collapsed && <p className="text-xs text-gray-500">© 2025 Conet</p>}
+      </div>
     </aside>
   );
 }

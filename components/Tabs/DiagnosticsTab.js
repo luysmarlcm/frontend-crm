@@ -2,7 +2,8 @@
 import { useState, useMemo } from 'react';
 import CardSection from '../diagnostics/CardSection';   
 import DataField from '../diagnostics/DataField';
-import { IdCard, Waypoints, Gauge, Search, LifeBuoy, Network, ArrowDownUp, Info, } from 'lucide-react';
+import TableTraffic from '../TrafficTable'; 
+import { IdCard, Waypoints, Gauge, Search, LifeBuoy, Network, ArrowDownUp, Info, Table, MonitorUp, ChartLine } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 // Función utilitaria para parsear los resultados del ping
@@ -31,6 +32,8 @@ const parsePingResults = (pingData) => {
 
 export const DiagnosticsTab = ({resultado}) => {
 
+  console.log("DiagnosticsTab resultado:", resultado);
+
  const connectionData = resultado?.conexion || {};
   const onuData = resultado?.onu || {};
    
@@ -38,7 +41,7 @@ export const DiagnosticsTab = ({resultado}) => {
     
   return (
       <>
-            <CardSection title="Diagnóstico" IconComponent={IdCard}>
+            <CardSection title={connectionData.conexion_nombre}  IconComponent={ChartLine}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
                 <DataField label="Cliente" value={connectionData.conexion_nombre || '—'} />
                 <DataField label="Plan" value={connectionData.plan_nombre || '—'} />
@@ -52,8 +55,17 @@ export const DiagnosticsTab = ({resultado}) => {
                 <DataField label="Onu Status" value={<span className={` ${onuData.onu_status === 'Online' ? 'text-green-500' : 'text-red-500'}`}>{onuData.onu_status || '—'}</span>} />
                 <DataField label="ONU RX" value={onuData.onu_rx || '—'} />
                 <DataField label="ONU TX" value={onuData.onu_tx || '—'} />
-                <DataField label="OLT RX" value={onuData.onu_rx || '—'} />
+               
+                 <DataField
+                  label="OLT RX"
+                  value={
+                    connectionData.registro_evento?.[2]?.[2]
+                      ? `${connectionData.registro_evento?.[2]?.[2]} dBm`
+                      : "—"
+                  }
+                />
                 <DataField label="OLT TX" value={connectionData.registro_evento?.[10]?.[2] || '—'} />
+                
               </div>
             </CardSection>
 
@@ -86,13 +98,16 @@ export const DiagnosticsTab = ({resultado}) => {
                 </CardSection>
             )}
 
-            <CardSection title="Tráfico Conexión" IconComponent={ArrowDownUp}>
+            <CardSection title="Tráfico Semanal" IconComponent={ArrowDownUp}>
               <div className="grid grid-cols-3 gap-4">
                 <DataField label="Transferencia Mensual" value={connectionData.conexion_transferencia_mensual} />
                 <DataField label="Bajada Mensual" value={connectionData.conexion_bajada_mensual || '—'} />
                 <DataField label="Subida Mensual" value={connectionData.conexion_subida_mensual || '—'} />
               </div>
             </CardSection>
+            <CardSection title="Historial Trafico" IconComponent={MonitorUp}>
+             <TableTraffic data={connectionData.trafico_semanal || []} />
+            </CardSection> 
           </>
   )
 }

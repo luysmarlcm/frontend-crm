@@ -1,11 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import CardSection from './CardSection';
-import DataField from './DataField';
-import { Gauge, Search, IdCard, LifeBuoy, ArrowDownUp, Info, Waypoints } from 'lucide-react';
+import { Gauge, Search } from 'lucide-react';
 import HeaderPage from '../HeaderPage';
 import Tabs from '../Tabs';
 import { DiagnosticsTab } from '../Tabs/DiagnosticsTab';
@@ -13,51 +10,47 @@ import TicketsTab from '../Tabs/TicketsTab';
 import ClientDataTab from '../Tabs/ClientDataTab';
 import FullScreenLoader from '../FullScreenLoader';
 
-
-const tabs = [
-    {
-      id: 'client-data',
-      label: 'DATOS DE CLIENTE',
-      content: <ClientDataTab />,
-    },
-    {
-      id: 'diagnostics',
-      label: 'DIAGNÓSTICO',
-      // content: <DiagnosticsTab />,
-    },
-    {
-      id: 'tickets',
-      label: 'TICKETS',
-      content: <TicketsTab />,
-    },
-  ];
-
-
 export default function ConnectionDiagnostics() {
   const [cedula, setCedula] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingDiagnostico, setLoadingDiagnostico] = useState(false);
   const [error, setError] = useState(null);
-  const [resultado, setResultado] = useState(null);
+
+  const [resultado, setResultado] = useState(null); // solo cliente
+  const [diagnostico, setDiagnostico] = useState(null); // diagnóstico
   const [multipleConnections, setMultipleConnections] = useState(null);
+
+  const [activeTab, setActiveTab] = useState('client-data');
+
+  // 🔹 Normalizar datos (usa pk o id_servicio como fallback)
+  const normalizeClient = (client) => {
+    if (!client) return null;
+    return {
+      pk: client.pk || client.id_servicio,
+      ...client,
+    };
+  };
 
   const fetchData = async (cedula) => {
     setLoading(true);
     setError(null);
     setResultado(null);
     setMultipleConnections(null);
+    setDiagnostico(null);
 
     try {
-      const response = await axios.get(`http://localhost:4000/api/clientes/cedula/${cedula}`);
+      const response = await axios.get(`http://172.16.1.37:4000/api/clientes/cedula/${cedula}`);
 
-      // Si la API devuelve un array de múltiples conexiones
       if (Array.isArray(response.data) && response.data.length > 1) {
-        setMultipleConnections(response.data);
+        // múltiples conexiones → mostrar lista
+        setMultipleConnections(response.data.map(c => normalizeClient(c.cliente)));
       } else {
-        // Caso de un único cliente
-        setResultado(Array.isArray(response.data) ? response.data[0] : response.data);
+        const cliente = Array.isArray(response.data) ? response.data[0].cliente : response.data.cliente;
+        setResultado(normalizeClient(cliente));
       }
 
       console.log('Resultado de la API:', response.data);
+      setCedula('');
     } catch (err) {
       const errorMessage = err.response
         ? `Error: ${err.response.status} - ${err.response.data.error || err.response.statusText}`
@@ -81,14 +74,42 @@ export default function ConnectionDiagnostics() {
   const handleConnectionSelect = (pk) => {
     if (!multipleConnections) return;
     const selected = multipleConnections.find(conn => conn.pk === pk);
-    if (selected) setResultado(selected);
-    setMultipleConnections(null);
+    if (selected) setResultado(normalizeClient(selected));
   };
 
-  const connectionData = resultado?.conexion || {};
-  const onuData = resultado?.onu || {};
+  const handleBackToConnections = () => {
+    setResultado(null); // quitar el detalle
+  };
 
-  console.log(resultado, "json")
+  // 🔹 Reset diagnóstico cuando cambia el contrato
+  useEffect(() => {
+    setDiagnostico(null);
+  }, [resultado?.pk]);
+
+  // 🔹 Cargar diagnóstico solo cuando se abre la pestaña
+  const pk = resultado?.pk ?? null;
+
+  useEffect(() => {
+    console.log('DEBUG useEffect diagnóstico:', { activeTab, pk, resultado });
+    if (activeTab === 'diagnostics' && pk) {
+      const fetchDiagnostico = async () => {
+        setLoadingDiagnostico(true);
+        try {
+          const response = await axios.get(
+            `http://172.16.1.37:4000/api/diagnostico-nodo?pk=${pk}`
+          );
+          setDiagnostico(response.data);
+        } catch (err) {
+          setDiagnostico({ error: "No se pudo obtener diagnóstico" });
+        } finally {
+          setLoadingDiagnostico(false);
+        }
+      };
+      fetchDiagnostico();
+    }
+  }, [activeTab, pk]); // 👈 Solo depende de activeTab y pk
+
+
 
   const tabs = [
     {
@@ -96,19 +117,59 @@ export default function ConnectionDiagnostics() {
       label: 'DATOS DE CLIENTE',
       content: <ClientDataTab resultado={resultado} />,
     },
-    {
-      id: 'diagnostics',
-      label: 'DIAGNÓSTICO',
-      content: <DiagnosticsTab resultado={resultado} />,
-    },
+   {
+  id: 'diagnostics',
+  label: 'DIAGNÓSTICO',
+  content: (
+    <>
+      {loadingDiagnostico && (
+        <div className="flex items-center justify-center py-6">
+          <span className="animate-spin h-6 w-6 border-4 border-green-500 border-t-transparent rounded-full mr-3"></span>
+          <span className="text-gray-700 font-semibold">Cargando diagnóstico...</span>
+        </div>
+      )}
+      {!loadingDiagnostico && diagnostico && (
+        <DiagnosticsTab resultado={diagnostico} />
+      )}
+      {!loadingDiagnostico && !diagnostico && resultado && (
+        <div className="flex flex-col items-center py-4">
+          <button
+            className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-md hover:bg-green-600 transition-colors font-bold mb-4"
+            onClick={async () => {
+              setLoadingDiagnostico(true);
+              try {
+                // Obtener zona del cliente (ajusta según tu estructura)
+                const zona = resultado?.zona?.nombre || resultado?.zona || resultado?.ciudad_815 || resultado?.ciudad;
+                const response = await axios.get(
+                  `http://172.16.1.37:4000/api/diagnostico-nodo?pk=${resultado.pk}&zona=${zona}`
+                );
+                setDiagnostico(response.data);
+              } catch (err) {
+                setDiagnostico({ error: "No se pudo obtener diagnóstico" });
+              } finally {
+                setLoadingDiagnostico(false);
+              }
+            }}
+          >
+            Generar diagnóstico
+          </button>
+          <p className="text-gray-500 text-center">Haz clic para obtener el diagnóstico de este cliente.</p>
+        </div>
+      )}
+      {!loadingDiagnostico && !diagnostico && !resultado && (
+        <p className="text-gray-500 text-center py-4">
+          Selecciona un cliente y abre esta pestaña para ver el diagnóstico.
+        </p>
+      )}
+    </>
+  ),
+},
     // {
     //   id: 'tickets',
     //   label: 'TICKETS',
-    //   content: <TicketsTab />,
+    //   content: <TicketsTab resultado={resultado} />,
     // },
   ];
-
-  // const { pingTimes, pingSummary } = useMemo(() => parsePingResults(connectionData.conexion_ping_icmp), [connectionData.conexion_ping_icmp]);
 
   return (
     <div className="p-8 bg-gray-100 min-h-screen font-sans">
@@ -117,92 +178,77 @@ export default function ConnectionDiagnostics() {
           <HeaderPage title="Diagnóstico de Conexión" IconComponent={Gauge} />
         </div>
 
-      <form 
-            onSubmit={handleSubmit} 
-            className="flex flex-col sm:flex-row items-end sm:items-center gap-4 mb-6 bg-white shadow-md py-5 px-6 rounded-xl"
-      >
-            <div className="flex-1 w-full">
-              <label 
-                htmlFor="client-id" 
-                className="block text-sm font-semibold text-gray-700 mb-1"
-              >
-                Cédula
-              </label>
-              <input
-                type="number"
-                id="client-id"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-400 transition"
-                placeholder="Cédula del cliente"
-                value={cedula}
-                onChange={(e) => setCedula(e.target.value)}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex items-center justify-center space-x-2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-md hover:bg-green-600 transition-colors font-bold disabled:bg-gray-400 disabled:cursor-not-allowed"
+        {/* Formulario de búsqueda */}
+        <form 
+          onSubmit={handleSubmit} 
+          className="flex flex-col sm:flex-row items-end sm:items-center gap-4 mb-6 bg-white shadow-md py-5 px-6 rounded-xl"
+        >
+          <div className="flex-1 w-full">
+            <label 
+              htmlFor="client-id" 
+              className="block text-sm font-semibold text-gray-700 mb-1"
             >
-              <Search className='w-5 h-5' />
-              <span>{loading ? 'Buscando...' : 'Buscar'}</span>
-            </button>
-      </form>
+              Cédula
+            </label>
+            <input
+              type="number"
+              id="client-id"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-400 transition"
+              placeholder="Cédula del cliente"
+              value={cedula}
+              onChange={(e) => setCedula(e.target.value)}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex items-center justify-center space-x-2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-md hover:bg-green-600 transition-colors font-bold disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <Search className='w-5 h-5' />
+            <span>{loading ? 'Buscando...' : 'Buscar'}</span>
+          </button>
+        </form>
 
-      {loading &&  <FullScreenLoader show={loading} text="Buscando informacion de cliente..." />}
+        {/* Loader y errores */}
+        {loading && <FullScreenLoader show={loading} text="Buscando información de cliente..." />}
         {error && <div className="p-4 mb-4 text-red-700 bg-red-100 rounded-lg">{error}</div>}
-        
-        {resultado && !multipleConnections && (
-           <Tabs tabs={tabs} />
-          )} 
-        
 
-          {/* {loading && <div className="p-4 mb-4 text-blue-700 bg-blue-100 rounded-lg">Cargando...</div>}
-          {error && <div className="p-4 mb-4 text-red-700 bg-red-100 rounded-lg">{error}</div>}
-
-          {multipleConnections && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-800 p-6 rounded-lg shadow-inner mb-6">
-              <h2 className="text-xl font-bold mb-4">Se encontraron múltiples conexiones.</h2>
-              <div className="space-y-4">
-                {multipleConnections.map(conn => (
-                  <div
-                    key={conn.pk}
-                    className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleConnectionSelect(conn.pk)}
-                  >
-                    <p className="font-semibold text-lg">{conn.fields.nombre_completo}</p>
-                    <p className="text-sm text-gray-600">PK: <span className="font-mono">{conn.pk}</span></p>
-                    <p className="text-sm text-gray-600">Dirección: {conn.fields.domicilio || '—'}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {resultado && !multipleConnections && (
-            <>
-              <CardSection title="Datos Cliente" IconComponent={IdCard}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                  <DataField label="Cliente" value={connectionData.conexion_nombre || '—'} />
-                  <DataField label="Plan" value={connectionData.plan_nombre || '—'} />
-                  <DataField label="Dirección IP" value={connectionData.direccion_ip || '—'} />
-                  <DataField label="MAC Actual" value={connectionData.mac_actual || '—'} />
+        {/* Lista de múltiples conexiones */}
+        {multipleConnections && !resultado && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-6 rounded-lg shadow-inner mb-6">
+            <h2 className="text-xl font-bold mb-4">Se encontraron múltiples conexiones.</h2>
+            <div className="space-y-4">
+              {multipleConnections.map((conn, idx) => (
+                <div
+                  key={conn.pk || idx}
+                  className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleConnectionSelect(conn.pk)}
+                >
+                  <p className="font-semibold text-lg">
+                    {conn.nombre_completo || conn.nombre || "Sin nombre"}
+                  </p>
+                  <p className="text-sm text-gray-600">Contrato: <span className="font-mono">{conn.pk}</span></p>
+                  <p className="text-sm text-gray-600">Dirección: {conn.domicilio || conn.direccion || '—'}</p>
                 </div>
-              </CardSection>
+              ))}
+            </div>
+          </div>
+        )}
 
-              {pingTimes.length > 0 && (
-                <CardSection title="Tiempos de Ping (ms)" IconComponent={Waypoints}>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={pingTimes}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="sequence" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="time" stroke="#82ca9d" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardSection>
-              )}
-            </>
-          )} */}
+        {/* Detalle de un contrato seleccionado con botón de volver */}
+        {resultado && (
+          <div>
+            {multipleConnections && (
+              <button
+                onClick={handleBackToConnections}
+                className="mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
+              >
+                ← Volver a conexiones
+              </button>
+            )}
+            <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+          </div>
+        )}
       </div>
     </div>
   );
