@@ -21,6 +21,8 @@ export default function ConnectionDiagnostics() {
   const [multipleConnections, setMultipleConnections] = useState(null);
 
   const [activeTab, setActiveTab] = useState('client-data');
+  const URL_SERVER = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 
   // 🔹 Normalizar datos (usa pk o id_servicio como fallback)
   const normalizeClient = (client) => {
@@ -39,7 +41,7 @@ export default function ConnectionDiagnostics() {
     setDiagnostico(null);
 
     try {
-      const response = await axios.get(`http://172.16.1.37:4000/api/clientes/cedula/${cedula}`);
+      const response = await axios.get(`${URL_SERVER}/api/clientes/cedula/${cedula}`);
 
       if (Array.isArray(response.data) && response.data.length > 1) {
         // múltiples conexiones → mostrar lista
@@ -96,7 +98,7 @@ export default function ConnectionDiagnostics() {
         setLoadingDiagnostico(true);
         try {
           const response = await axios.get(
-            `http://172.16.1.37:4000/api/diagnostico-nodo?pk=${pk}`
+            `${URL_SERVER}/api/diagnostico-nodo?pk=${pk}`
           );
           setDiagnostico(response.data);
         } catch (err) {
