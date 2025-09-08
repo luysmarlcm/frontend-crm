@@ -1,0 +1,9 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: NEXT_PUBLIC_URL_SERVER=http://172.16.1.37:4000
